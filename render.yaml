@@ -14,7 +14,3 @@ services:
         value: production
       - key: PORT
         value: 10000
-    disk:
-      name: session-data
-      mountPath: /opt/render/project/src/session_data
-      sizeGB: 1
