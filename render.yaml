@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: whatsapp-gemini-bot
+    runtime: node
+    plan: free
+    region: oregon
+    branch: main
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /ping
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    disk:
+      name: session-data
+      mountPath: /opt/render/project/src/session_data
+      sizeGB: 1
