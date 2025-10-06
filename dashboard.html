@@ -3,277 +3,475 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🤖 WhatsApp Bot Dashboard</title>
+    <title>🤖 Bot WhatsApp + Gemini AI</title>
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            margin: 0; padding: 20px; color: #333;
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
         }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .header { text-align: center; color: white; margin-bottom: 30px; }
-        .header h1 { font-size: 2.5rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
-        .stats {
-            display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px; margin-bottom: 30px;
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
         }
-        .card {
-            background: white; border-radius: 15px; padding: 20px;
-            box-shadow: 0 8px 25px rgba(0,0,0,0.1); text-align: center;
+        
+        .header {
+            background: linear-gradient(135deg, #25D366 0%, #128C7E 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
         }
-        .card-icon { font-size: 2rem; margin-bottom: 10px; }
-        .card-value { font-size: 2rem; font-weight: bold; color: #667eea; }
-        .card-label { color: #666; font-size: 0.9rem; margin-top: 5px; }
-        .status {
-            padding: 8px 16px; border-radius: 20px; font-weight: bold;
-            font-size: 0.9rem; text-transform: uppercase;
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
         }
-        .status.online { background: #d4edda; color: #155724; }
-        .status.waiting { background: #fff3cd; color: #856404; }
-        .status.offline { background: #f8d7da; color: #721c24; }
-        .btn {
-            background: #667eea; color: white; border: none;
-            padding: 10px 20px; border-radius: 8px; font-weight: bold;
-            cursor: pointer; margin: 5px; text-decoration: none;
-            display: inline-block;
+        
+        .free-badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
         }
-        .btn:hover { background: #5a6fd8; }
-        .auth-section {
-            background: white; border-radius: 15px; padding: 20px;
-            margin-bottom: 20px; text-align: center;
+        
+        .content {
+            padding: 40px;
         }
-        .instructions {
-            background: #f8f9fa; padding: 15px; border-radius: 8px;
-            margin: 15px 0; border-left: 4px solid #667eea;
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
         }
+        
+        .status-card {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 15px;
+            text-align: center;
+            border-left: 5px solid #25D366;
+            transition: transform 0.2s;
+        }
+        
+        .status-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .status-card h3 {
+            color: #666;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .status-card .value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #25D366;
+        }
+        
+        .section {
+            background: #f8f9fa;
+            margin: 30px 0;
+            padding: 30px;
+            border-radius: 15px;
+        }
+        
+        .section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            border-bottom: 2px solid #25D366;
+            padding-bottom: 10px;
+        }
+        
         .qr-section {
-            background: white; border-radius: 15px; padding: 20px;
-            margin-bottom: 20px; text-align: center;
-            border: 2px dashed #667eea;
+            text-align: center;
+            background: linear-gradient(135deg, #ff7b7b 0%, #666ad1 100%);
+            color: white;
+            border-radius: 15px;
         }
+        
         .qr-code {
-            max-width: 256px; margin: 15px auto;
-            padding: 10px; background: white;
-            border: 2px solid #667eea; border-radius: 10px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            display: inline-block;
+            margin: 20px 0;
         }
-        .qr-code img { width: 100%; height: auto; }
-        .qr-expired {
-            background: #f8d7da; border-color: #dc3545;
+        
+        .qr-code img {
+            width: 256px;
+            height: 256px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+        }
+        
+        .commands-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .command-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #e9ecef;
+        }
+        
+        .command-card code {
+            background: #f8f9fa;
+            padding: 5px 10px;
+            border-radius: 5px;
+            color: #e83e8c;
+            font-weight: bold;
+        }
+        
+        .chats-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .chat-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #25D366;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .chat-item.inactive {
+            border-left-color: #dc3545;
+            opacity: 0.7;
+        }
+        
+        .chat-status {
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+        }
+        
+        .chat-status.active {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .chat-status.inactive {
+            background: #f8d7da;
             color: #721c24;
         }
-        .qr-waiting {
-            background: #d1ecf1; border-color: #17a2b8;
-            color: #0c5460;
+        
+        .links {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-top: 30px;
         }
-        .footer {
-            text-align: center; color: white; margin-top: 30px;
-            opacity: 0.8;
+        
+        .link-btn {
+            background: #25D366;
+            color: white;
+            padding: 12px 24px;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: bold;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
-        .footer a { color: white; }
-        .free-plan {
-            background: #e8f5e8; border: 2px solid #28a745;
-            border-radius: 10px; padding: 15px; margin: 20px 0;
+        
+        .link-btn:hover {
+            background: #128C7E;
+            transform: translateY(-2px);
+        }
+        
+        .error { color: #dc3545; }
+        .success { color: #28a745; }
+        
+        .loading {
             text-align: center;
+            padding: 40px;
+            color: #666;
         }
-        .free-plan h4 { color: #28a745; margin: 0 0 10px 0; }
-        .hidden { display: none; }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        
+        .loading {
+            animation: pulse 2s infinite;
+        }
+        
         @media (max-width: 768px) {
-            .stats { grid-template-columns: 1fr; }
-            .header h1 { font-size: 2rem; }
+            .container { margin: 10px; border-radius: 10px; }
+            .content { padding: 20px; }
+            .header { padding: 20px; }
+            .header h1 { font-size: 2em; }
+            .links { justify-content: center; }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🤖 WhatsApp + Gemini Bot</h1>
-            <p>Dashboard de Monitoramento em Tempo Real</p>
+            <div class="free-badge">🆓 PLANO FREE ATIVO</div>
+            <h1>🤖 Bot WhatsApp + Gemini AI</h1>
+            <p>Sistema inteligente com IA personalizada</p>
         </div>
         
-        <div class="free-plan">
-            <h4>🆓 PLANO FREE ATIVO</h4>
-            <p>Funcionando 100% gratuito no Render! QR Code aparece aqui quando necessário.</p>
-        </div>
-        
-        <!-- Seção do QR Code -->
-        <div id="qr-section" class="qr-section hidden">
-            <h3>📱 QR Code para Autenticação</h3>
-            <p id="qr-message">Escaneie o QR Code abaixo com seu WhatsApp</p>
-            <div id="qr-code" class="qr-code">
-                <img id="qr-image" src="" alt="QR Code para WhatsApp" />
+        <div class="content">
+            <div id="loading" class="loading">
+                <h2>⏳ Carregando dados...</h2>
+                <p>Conectando com o bot...</p>
             </div>
-            <div class="instructions">
-                📱 <strong>Como escanear:</strong><br>
-                1. Abra o WhatsApp no seu celular<br>
-                2. Toque em "Mais opções" (três pontos)<br>
-                3. Toque em "WhatsApp Web"<br>
-                4. Aponte a câmera para o QR Code acima
+            
+            <div id="content-main" style="display: none;">
+                <!-- Status Cards -->
+                <div class="status-grid">
+                    <div class="status-card">
+                        <h3>Status do Bot</h3>
+                        <div class="value" id="bot-status">--</div>
+                    </div>
+                    <div class="status-card">
+                        <h3>Chats Ativos</h3>
+                        <div class="value" id="active-chats">0</div>
+                    </div>
+                    <div class="status-card">
+                        <h3>Total Mensagens</h3>
+                        <div class="value" id="total-messages">0</div>
+                    </div>
+                    <div class="status-card">
+                        <h3>Tempo Online</h3>
+                        <div class="value" id="uptime">--</div>
+                    </div>
+                    <div class="status-card">
+                        <h3>Prompts Personalizados</h3>
+                        <div class="value" id="custom-prompts">0</div>
+                    </div>
+                </div>
+                
+                <!-- QR Code Section -->
+                <div id="qr-section" class="section qr-section" style="display: none;">
+                    <h2>📱 Escaneie o QR Code</h2>
+                    <p>Use seu WhatsApp para escanear o código abaixo:</p>
+                    <div class="qr-code">
+                        <img id="qr-image" src="" alt="QR Code">
+                    </div>
+                    <p><strong>Como escanear:</strong></p>
+                    <p>1. Abra o WhatsApp no seu celular</p>
+                    <p>2. Toque nos 3 pontos (⋮) no canto superior</p>
+                    <p>3. Selecione "Aparelhos conectados"</p>
+                    <p>4. Toque em "Conectar um aparelho"</p>
+                    <p>5. Aponte a câmera para o QR Code acima</p>
+                </div>
+                
+                <!-- Comandos -->
+                <div class="section">
+                    <h2>📋 Comandos Disponíveis</h2>
+                    <div class="commands-grid">
+                        <div class="command-card">
+                            <h3>🤖 Controle do Bot</h3>
+                            <p><code>/bot</code> - Liga/desliga bot (toggle)</p>
+                            <p><code>/bot status</code> - Mostra status atual</p>
+                        </div>
+                        <div class="command-card">
+                            <h3>🎭 Sistema de Prompts</h3>
+                            <p><code>/prompt [texto]</code> - Define novo prompt</p>
+                            <p><code>/prompt show</code> - Mostra prompt atual</p>
+                            <p><code>/prompt reset</code> - Reseta prompt padrão</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Lista de Chats -->
+                <div class="section">
+                    <h2>💬 Chats Ativos</h2>
+                    <div id="chats-container">
+                        <div id="no-chats" style="text-align: center; color: #666; padding: 20px;">
+                            <p>Nenhuma conversa iniciada ainda.</p>
+                            <p>Envie uma mensagem para o bot para começar!</p>
+                        </div>
+                        <div id="chats-list" class="chats-list"></div>
+                    </div>
+                </div>
+                
+                <!-- Estatísticas Detalhadas -->
+                <div class="section">
+                    <h2>📊 Informações do Sistema</h2>
+                    <div class="status-grid">
+                        <div class="status-card">
+                            <h3>Autenticação</h3>
+                            <div class="value" id="auth-status">--</div>
+                        </div>
+                        <div class="status-card">
+                            <h3>Total de Chats</h3>
+                            <div class="value" id="total-chats">0</div>
+                        </div>
+                        <div class="status-card">
+                            <h3>Chats Inativos</h3>
+                            <div class="value" id="inactive-chats">0</div>
+                        </div>
+                        <div class="status-card">
+                            <h3>Última Atividade</h3>
+                            <div class="value" id="last-update">--</div>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
-        
-        <div class="stats">
-            <div class="card">
-                <div class="card-icon">🔌</div>
-                <div class="card-value" id="status">Carregando...</div>
-                <div class="card-label">Status da Conexão</div>
+            
+            <!-- Links Úteis -->
+            <div class="links">
+                <a href="/api" class="link-btn">
+                    🔌 API JSON
+                </a>
+                <a href="https://github.com/seujao436/whatsapp-gemini-bot" class="link-btn" target="_blank">
+                    📁 GitHub Bot
+                </a>
+                <a href="https://github.com/seujao436/keep-alive-service" class="link-btn" target="_blank">
+                    🔄 Keep-Alive
+                </a>
+                <a href="https://render.com" class="link-btn" target="_blank">
+                    ☁️ Render
+                </a>
+                <a href="https://aistudio.google.com/app/apikey" class="link-btn" target="_blank">
+                    🤖 Gemini API
+                </a>
             </div>
-            <div class="card">
-                <div class="card-icon">💬</div>
-                <div class="card-value" id="messages">-</div>
-                <div class="card-label">Mensagens Processadas</div>
-            </div>
-            <div class="card">
-                <div class="card-icon">🤖</div>
-                <div class="card-value" id="responses">-</div>
-                <div class="card-label">Respostas Gemini IA</div>
-            </div>
-            <div class="card">
-                <div class="card-icon">🕑</div>
-                <div class="card-value" id="uptime">-</div>
-                <div class="card-label">Tempo Ativo</div>
-            </div>
-        </div>
-        
-        <div class="auth-section">
-            <h3>📱 Status de Autenticação</h3>
-            <p>Status: <span id="auth-status" class="status waiting">Carregando...</span></p>
-            <div class="instructions" id="instructions">Verificando status...</div>
-            <div style="margin-top: 15px;">
-                <a href="#" class="btn" onclick="refresh()">🔄 Atualizar</a>
-                <a href="/ping" class="btn" target="_blank" style="background: #28a745;">🎯 Ping</a>
-                <a href="/auth-status" class="btn" target="_blank" style="background: #17a2b8;">📱 Auth</a>
-                <a href="/api" class="btn" target="_blank" style="background: #ffc107; color: #000;">📊 API</a>
-            </div>
-        </div>
-        
-        <div class="card">
-            <h3>🛠️ Links Úteis</h3>
-            <div>
-                <a href="https://github.com/seujao436/whatsapp-gemini-bot" class="btn" target="_blank">🐈 GitHub Bot</a>
-                <a href="https://github.com/seujao436/keep-alive-service" class="btn" target="_blank">🔄 Keep-Alive</a>
-                <a href="https://render.com" class="btn" target="_blank">☁️ Render</a>
-                <a href="https://aistudio.google.com/app/apikey" class="btn" target="_blank" style="background: #db4437;">🤖 Gemini API</a>
-            </div>
-        </div>
-        
-        <div class="footer">
-            <p>Desenvolvido por <a href="https://github.com/seujao436">seujao436</a></p>
-            <p>Gemini AI • Render.com (FREE) • WhatsApp Web.js</p>
-            <p><small>Atualização automática a cada 30 segundos</small></p>
         </div>
     </div>
-    
+
     <script>
-        function getStatusClass(status) {
-            if (['conectado', 'autenticado'].includes(status)) return 'online';
-            if (['aguardando_scan', 'aguardando'].includes(status)) return 'waiting';
-            return 'offline';
-        }
+        let updateInterval;
         
-        function getStatusText(status) {
-            const texts = {
-                'conectado': 'Online',
-                'autenticado': 'Conectado',
-                'aguardando_scan': 'Aguardando QR',
-                'aguardando': 'Iniciando',
-                'falha_auth': 'Erro',
-                'desconectado': 'Desconectado'
-            };
-            return texts[status] || 'Offline';
-        }
-        
-        function getInstructions(status) {
-            const instructions = {
-                'conectado': '✅ Bot funcionando! Envie mensagens para o número autenticado.',
-                'autenticado': '✅ WhatsApp conectado com sucesso!',
-                'aguardando_scan': '📱 QR Code exibido acima! Escaneie com seu WhatsApp.',
-                'aguardando': '⏳ Inicializando... QR Code aparecerá em breve.',
-                'falha_auth': '❌ Erro na autenticação. Novo QR Code será gerado.',
-                'desconectado': '🔌 Desconectado. Tentando reconectar...'
-            };
-            return instructions[status] || '⚠️ Status desconhecido. Verifique os logs.';
-        }
-        
-        function updateQRCode(data) {
-            const qrSection = document.getElementById('qr-section');
-            const qrImage = document.getElementById('qr-image');
-            const qrMessage = document.getElementById('qr-message');
-            
-            if (data.qrCode && data.authenticationStatus === 'aguardando_scan') {
-                // Mostra QR Code
-                qrSection.classList.remove('hidden', 'qr-expired');
-                qrSection.classList.add('qr-waiting');
-                qrImage.src = data.qrCode;
-                qrMessage.textContent = 'Escaneie o QR Code abaixo com seu WhatsApp';
-                console.log('📱 QR Code exibido no dashboard');
-            } else if (data.qrCodeExpired) {
-                // QR Code expirado
-                qrSection.classList.remove('hidden', 'qr-waiting');
-                qrSection.classList.add('qr-expired');
-                qrMessage.textContent = 'QR Code expirado. Aguarde um novo...';
-                console.log('⚠️ QR Code expirado');
-            } else if (['conectado', 'autenticado'].includes(data.authenticationStatus)) {
-                // Conectado - esconde QR Code
-                qrSection.classList.add('hidden');
-                console.log('✅ WhatsApp conectado - QR Code ocultado');
-            } else {
-                // Outros status - esconde QR Code
-                qrSection.classList.add('hidden');
-            }
-        }
-        
-        async function loadData() {
+        async function updateData() {
             try {
-                // Busca dados do endpoint API
-                const baseUrl = window.location.origin;
-                const response = await fetch(`${baseUrl}/api`);
-                
-                if (!response.ok) throw new Error('Erro na resposta');
-                
+                const response = await fetch('/api');
                 const data = await response.json();
                 
-                // Atualiza estatísticas
-                document.getElementById('messages').textContent = data.stats?.totalMessages || 0;
-                document.getElementById('responses').textContent = data.stats?.responsesGenerated || 0;
-                document.getElementById('uptime').textContent = data.uptime || '-';
+                // Update status cards
+                document.getElementById('bot-status').textContent = 
+                    data.authenticated ? '🟢 Online' : '🔴 Offline';
+                document.getElementById('active-chats').textContent = data.stats.activeChats;
+                document.getElementById('total-messages').textContent = data.stats.totalMessages;
+                document.getElementById('uptime').textContent = data.uptime;
+                document.getElementById('custom-prompts').textContent = data.stats.customPrompts;
                 
-                // Atualiza status
-                const status = data.authenticationStatus || 'offline';
-                const statusText = getStatusText(status);
-                const statusClass = getStatusClass(status);
+                // Update detailed stats
+                document.getElementById('auth-status').textContent = 
+                    data.authenticated ? '✅ Autenticado' : '❌ Desconectado';
+                document.getElementById('total-chats').textContent = data.stats.totalChats;
+                document.getElementById('inactive-chats').textContent = data.stats.inactiveChats;
+                document.getElementById('last-update').textContent = 
+                    new Date().toLocaleTimeString('pt-BR');
                 
-                document.getElementById('status').innerHTML = `<span class="status ${statusClass}">${statusText}</span>`;
-                document.getElementById('auth-status').className = `status ${statusClass}`;
-                document.getElementById('auth-status').textContent = statusText;
-                document.getElementById('instructions').textContent = getInstructions(status);
+                // Handle QR Code
+                await handleQRCode(data);
                 
-                // Atualiza QR Code
-                updateQRCode(data);
+                // Update chats list
+                updateChatsList(data.chats);
                 
-                console.log('Dashboard atualizado:', new Date().toLocaleTimeString(), `Status: ${status}`);
+                // Show main content, hide loading
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content-main').style.display = 'block';
                 
             } catch (error) {
-                console.error('Erro ao carregar dados:', error);
-                document.getElementById('status').innerHTML = '<span class="status offline">Erro</span>';
-                document.getElementById('instructions').textContent = '❌ Não foi possível conectar ao bot. Verifique se o serviço está rodando.';
-                document.getElementById('qr-section').classList.add('hidden');
+                console.error('Erro ao atualizar dados:', error);
+                document.getElementById('loading').innerHTML = 
+                    '<h2>❌ Erro de Conexão</h2><p>Tentando reconectar...</p>';
             }
         }
         
-        function refresh() {
-            console.log('Atualizando dashboard manualmente...');
-            loadData();
+        async function handleQRCode(data) {
+            const qrSection = document.getElementById('qr-section');
+            
+            if (!data.authenticated && data.connectionStatus === 'aguardando_scan') {
+                try {
+                    const qrResponse = await fetch('/qr-code');
+                    const qrData = await qrResponse.json();
+                    
+                    if (qrData.success && qrData.qrCode) {
+                        document.getElementById('qr-image').src = qrData.qrCode;
+                        qrSection.style.display = 'block';
+                    } else {
+                        qrSection.style.display = 'none';
+                    }
+                } catch (error) {
+                    console.error('Erro ao buscar QR Code:', error);
+                    qrSection.style.display = 'none';
+                }
+            } else {
+                qrSection.style.display = 'none';
+            }
         }
         
-        // Carrega dados iniciais
-        console.log('Inicializando dashboard...');
-        loadData();
+        function updateChatsList(chats) {
+            const chatsList = document.getElementById('chats-list');
+            const noChats = document.getElementById('no-chats');
+            
+            if (!chats || chats.length === 0) {
+                noChats.style.display = 'block';
+                chatsList.style.display = 'none';
+                return;
+            }
+            
+            noChats.style.display = 'none';
+            chatsList.style.display = 'block';
+            
+            chatsList.innerHTML = chats.map(chat => `
+                <div class="chat-item ${chat.active ? '' : 'inactive'}">
+                    <div>
+                        <strong>+${chat.phone}</strong>
+                        <br>
+                        <small>
+                            ${chat.customPrompt ? '🎭 Prompt: ' + chat.promptPreview : '📝 Prompt padrão'}
+                            <br>
+                            💬 ${chat.messageCount} mensagens
+                        </small>
+                    </div>
+                    <div class="chat-status ${chat.active ? 'active' : 'inactive'}">
+                        ${chat.active ? '✅ ATIVO' : '❌ INATIVO'}
+                    </div>
+                </div>
+            `).join('');
+        }
         
-        // Auto-refresh a cada 15 segundos (mais rápido para capturar QR Code)
-        setInterval(() => {
-            console.log('Auto-refresh...');
-            loadData();
-        }, 15000);
+        // Initial load
+        updateData();
+        
+        // Auto refresh every 15 seconds (faster for QR code detection)
+        updateInterval = setInterval(updateData, 15000);
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', () => {
+            if (updateInterval) {
+                clearInterval(updateInterval);
+            }
+        });
     </script>
 </body>
 </html>
