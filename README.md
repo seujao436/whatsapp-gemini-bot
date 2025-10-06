@@ -10,7 +10,7 @@ Bot inteligente para WhatsApp integrado com Gemini AI, que mantém contexto de c
 - 🧠 Mantém contexto das conversas
 - ⚡ Deploy em 1 clique no Render
 - 🔄 Suporta múltiplas conversas simultâneas
-- 📊 Dashboard com estatísticas em tempo real
+- 📊 **Dashboard HTML** com monitoramento em tempo real
 - 💰 Custo extremamente baixo (Gemini Flash)
 - 🆓 100% gratuito no Render FREE
 
@@ -24,8 +24,9 @@ Bot inteligente para WhatsApp integrado com Gemini AI, que mantém contexto de c
    - `GEMINI_API_KEY`: Sua chave da API do Gemini ([obter aqui](https://aistudio.google.com/app/apikey))
 4. Clique em **Apply**
 5. Aguarde o deploy completar
-6. Acesse os logs do serviço e **escaneie o QR Code** com seu WhatsApp
-7. Pronto! Seu bot está no ar 🎉
+6. **Acesse o dashboard**: `https://seu-bot.onrender.com`
+7. Verifique os logs e **escaneie o QR Code** com seu WhatsApp
+8. Pronto! Seu bot está no ar 🎉
 
 ### Opção 2: Deploy Manual
 
@@ -44,8 +45,33 @@ cp .env.example .env
 # 4. Execute localmente
 npm start
 
-# 5. Escaneie o QR Code que aparecerá no terminal
+# 5. Acesse: http://localhost:10000
+# 6. Escaneie o QR Code que aparecerá nos logs
 ```
+
+## 📊 Dashboard HTML
+
+### 🌐 Acesso ao Dashboard
+
+Após o deploy, acesse a URL do seu serviço para ver o dashboard em tempo real:
+
+```
+https://seu-bot.onrender.com/
+```
+
+### 🔍 Funcionalidades do Dashboard
+
+- **Status em Tempo Real**: Monitoramento da conexão WhatsApp
+- **Estatísticas**: Mensagens processadas, respostas IA, uptime
+- **Autenticação**: Status do QR Code e instruções
+- **Auto-Refresh**: Atualização automática a cada 30 segundos
+- **Links Rápidos**: Acesso direto aos logs e endpoints
+
+### 📁 Arquivos do Dashboard
+
+- `dashboard.html` - Interface visual completa
+- Endpoints JSON disponíveis em `/api`
+- Acesso direto via URL do serviço
 
 ## ❗ Importante - Plano FREE do Render
 
@@ -62,6 +88,7 @@ npm start
 2. **Bot ativo**: Responde mensagens normalmente
 3. **Restart**: Novo QR Code gerado - precisa escanear novamente
 4. **Sleep/Wake**: Use Keep-Alive para manter sempre ativo
+5. **Dashboard**: Monitore tudo em tempo real via interface web
 
 ## ⚙️ Configuração
 
@@ -86,6 +113,7 @@ Após o deploy e autenticação via QR Code:
 1. **Envie qualquer mensagem** para o número que você autenticou
 2. O bot responderá automaticamente usando Gemini AI
 3. Ele mantém contexto das últimas 20 mensagens da conversa
+4. **Monitore via dashboard** para acompanhar estatísticas
 
 ### Exemplo de Conversa
 
@@ -95,18 +123,6 @@ Bot: Olá! Estou bem, obrigado por perguntar...
 
 Você: Qual o clima hoje?
 Bot: [Resposta contextual baseada em IA]
-```
-
-### Modo Prefixo (Opcional)
-
-Por padrão, o bot responde **todas** as mensagens. Para usar apenas com prefixo `.bot`, edite o `bot.js` e descomente as linhas indicadas:
-
-```javascript
-// Para usar apenas com prefixo .bot:
-if (messageBody.startsWith('.bot ')) {
-    const query = messageBody.replace('.bot ', '');
-    await generate(query, message, chatId);
-}
 ```
 
 ## 🛠️ Tecnologias
@@ -121,10 +137,12 @@ if (messageBody.startsWith('.bot ')) {
 
 | Endpoint | Método | Descrição |
 |----------|--------|-----------|
-| `/` | GET | Status e estatísticas do bot |
-| `/ping` | GET | Health check (retorna "pong") |
-| `/health` | GET | Status de saúde detalhado |
-| `/auth-status` | GET | Status da autenticação WhatsApp |
+| `/` | GET | Dashboard HTML |
+| `/api` | GET | Status JSON completo |
+| `/ping` | GET | Health check |
+| `/health` | GET | Status detalhado |
+| `/auth-status` | GET | Status autenticação |
+| `/dashboard.html` | GET | Dashboard HTML (arquivo estático) |
 
 ## 🔧 Desenvolvimento
 
@@ -133,6 +151,7 @@ if (messageBody.startsWith('.bot ')) {
 ```
 whatsapp-gemini-bot/
 ├── bot.js           # Arquivo principal do bot
+├── dashboard.html    # Dashboard de monitoramento
 ├── package.json     # Dependências do projeto
 ├── render.yaml      # Configuração do Render
 ├── .env.example     # Exemplo de variáveis
@@ -151,33 +170,32 @@ npm start
 
 # Ver logs do Render
 render logs -f
+
+# Acessar dashboard localmente
+# http://localhost:10000
 ```
 
 ## 🐛 Solução de Problemas
 
 ### QR Code não aparece
 
-- ✅ Verifique os logs do Render
+- ✅ Verifique os logs do Render via dashboard
 - ✅ Aguarde alguns minutos após o deploy
 - ✅ O QR Code aparece apenas quando o client inicializa
+- ✅ Use o dashboard para monitorar o status em tempo real
 
 ### Bot não responde
 
 - ✅ Confirme que a `GEMINI_API_KEY` está configurada
-- ✅ Verifique se o QR Code foi escaneado
-- ✅ Verifique o status no endpoint `/auth-status`
+- ✅ Verifique se o QR Code foi escaneado via dashboard
+- ✅ Monitore o status no dashboard HTML
 - ✅ Veja os logs para identificar erros
 
 ### Serviço dorme após inatividade
 
 - ✅ Use o [keep-alive service](https://github.com/seujao436/keep-alive-service) complementar
 - ✅ Configure UptimeRobot para pingar a cada 12 minutos
-
-### "Needs to re-authenticate"
-
-- ✅ **Normal no plano FREE** - reescaneie o QR Code
-- ✅ Verifique logs para novo QR Code
-- ✅ Acontece a cada restart do serviço
+- ✅ Monitore o uptime via dashboard
 
 ## 🔄 Manter Sempre Ativo
 
@@ -186,6 +204,7 @@ render logs -f
 1. Deploy o [Keep-Alive Service](https://github.com/seujao436/keep-alive-service)
 2. Configure a `BOT_URL` com: `https://seu-bot.onrender.com/ping`
 3. O serviço fará ping a cada 12 minutos
+4. Monitore ambos via seus respectivos dashboards
 
 ### Opção 2: UptimeRobot
 
@@ -196,11 +215,12 @@ render logs -f
 
 ## 💡 Dicas
 
-1. **Custos**: O Gemini Flash é extremamente barato (~$0.075 por 1M tokens)
-2. **Contexto**: O bot mantém as últimas 20 mensagens por chat
-3. **Grupos**: Por padrão, ignora mensagens de grupos (modificável no código)
-4. **Reautenticação**: É normal no plano FREE - mantenha o WhatsApp à mão
-5. **Logs**: Sempre verifique os logs do Render para troubleshooting
+1. **Dashboard**: Use o dashboard HTML para monitoramento em tempo real
+2. **Custos**: O Gemini Flash é extremamente barato (~$0.075 por 1M tokens)
+3. **Contexto**: O bot mantém as últimas 20 mensagens por chat
+4. **Grupos**: Por padrão, ignora mensagens de grupos (modificável)
+5. **Reautenticação**: É normal no plano FREE - monitore via dashboard
+6. **Logs**: Dashboard fornece links diretos para logs do Render
 
 ## ⚙️ Customizações
 
@@ -226,11 +246,13 @@ if (messageBody.startsWith('.bot ')) {
 }
 ```
 
-### Alterar Modelo Gemini
+### Personalizar Dashboard
 
-Substitua `gemini-2.0-flash-exp` por:
-- `gemini-1.5-flash` (mais rápido)
-- `gemini-1.5-pro` (mais inteligente, mais caro)
+Edite o arquivo `dashboard.html` para:
+- Alterar cores e estilos
+- Adicionar mais métricas
+- Customizar intervals de atualização
+- Adicionar novos gráficos
 
 ## 🤝 Contribuindo
 
@@ -268,4 +290,4 @@ Desenvolvido com ❤️ usando:
 
 **⭐ Se este projeto te ajudou, deixe uma estrela no GitHub!**
 
-**💡 Dica**: Para experimentos rápidos, o plano FREE é perfeito. Para uso profissional, considere o upgrade para plano pago do Render para autenticação persistente.
+**🌐 Acesse o dashboard após o deploy para monitoramento em tempo real!**
