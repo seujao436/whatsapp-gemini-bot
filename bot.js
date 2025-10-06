@@ -2,6 +2,7 @@ const { Client, NoAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const express = require('express');
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -162,9 +163,15 @@ client.initialize();
 
 // Servidor Express para o Render
 app.use(express.json());
+app.use(express.static(path.join(__dirname))); // Serve arquivos estáticos (incluindo dashboard.html)
 
-// Endpoint principal com estatísticas
+// Endpoint principal - serve o dashboard HTML
 app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'dashboard.html'));
+});
+
+// Endpoint JSON com estatísticas (para API)
+app.get('/api', (req, res) => {
     const uptime = Math.floor((Date.now() - stats.startTime.getTime()) / 1000);
     const uptimeFormatted = `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${uptime % 60}s`;
     
@@ -181,7 +188,8 @@ app.get('/', (req, res) => {
         },
         timestamp: new Date().toLocaleString('pt-BR'),
         endpoints: {
-            '/': 'Status e estatísticas',
+            '/': 'Dashboard HTML',
+            '/api': 'Status JSON',
             '/ping': 'Health check',
             '/health': 'Status detalhado'
         },
@@ -249,7 +257,8 @@ function getAuthMessage(status) {
 // Inicia o servidor
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Servidor Express rodando na porta ${PORT}`);
-    console.log(`📊 Dashboard disponível em: http://localhost:${PORT}`);
+    console.log(`🌐 Dashboard HTML disponível em: http://localhost:${PORT}`);
+    console.log(`📊 API JSON disponível em: http://localhost:${PORT}/api`);
     console.log(`⚡ Plano: FREE (autenticação temporária)`);
     console.log(`🔄 Aguarde o QR Code aparecer nos logs...`);
 });
