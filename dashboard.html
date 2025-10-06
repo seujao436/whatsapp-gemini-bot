@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🤖 WhatsApp Bot Dashboard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0; padding: 20px; color: #333;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { text-align: center; color: white; margin-bottom: 30px; }
+        .header h1 { font-size: 2.5rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.3); }
+        .stats {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px; margin-bottom: 30px;
+        }
+        .card {
+            background: white; border-radius: 15px; padding: 20px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1); text-align: center;
+        }
+        .card-icon { font-size: 2rem; margin-bottom: 10px; }
+        .card-value { font-size: 2rem; font-weight: bold; color: #667eea; }
+        .card-label { color: #666; font-size: 0.9rem; margin-top: 5px; }
+        .status {
+            padding: 8px 16px; border-radius: 20px; font-weight: bold;
+            font-size: 0.9rem; text-transform: uppercase;
+        }
+        .status.online { background: #d4edda; color: #155724; }
+        .status.waiting { background: #fff3cd; color: #856404; }
+        .status.offline { background: #f8d7da; color: #721c24; }
+        .btn {
+            background: #667eea; color: white; border: none;
+            padding: 10px 20px; border-radius: 8px; font-weight: bold;
+            cursor: pointer; margin: 5px; text-decoration: none;
+            display: inline-block;
+        }
+        .btn:hover { background: #5a6fd8; }
+        .auth-section {
+            background: white; border-radius: 15px; padding: 20px;
+            margin-bottom: 20px; text-align: center;
+        }
+        .instructions {
+            background: #f8f9fa; padding: 15px; border-radius: 8px;
+            margin: 15px 0; border-left: 4px solid #667eea;
+        }
+        .footer {
+            text-align: center; color: white; margin-top: 30px;
+            opacity: 0.8;
+        }
+        .footer a { color: white; }
+        @media (max-width: 768px) {
+            .stats { grid-template-columns: 1fr; }
+            .header h1 { font-size: 2rem; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 WhatsApp + Gemini Bot</h1>
+            <p>Dashboard de Monitoramento</p>
+        </div>
+        
+        <div class="stats">
+            <div class="card">
+                <div class="card-icon">🔌</div>
+                <div class="card-value" id="status">Carregando...</div>
+                <div class="card-label">Status da Conexão</div>
+            </div>
+            <div class="card">
+                <div class="card-icon">💬</div>
+                <div class="card-value" id="messages">-</div>
+                <div class="card-label">Mensagens Processadas</div>
+            </div>
+            <div class="card">
+                <div class="card-icon">🤖</div>
+                <div class="card-value" id="responses">-</div>
+                <div class="card-label">Respostas Gemini IA</div>
+            </div>
+            <div class="card">
+                <div class="card-icon">🕑</div>
+                <div class="card-value" id="uptime">-</div>
+                <div class="card-label">Tempo Ativo</div>
+            </div>
+        </div>
+        
+        <div class="auth-section">
+            <h3>📱 Autenticação WhatsApp</h3>
+            <p>Status: <span id="auth-status" class="status waiting">Carregando...</span></p>
+            <div class="instructions" id="instructions">Verificando status...</div>
+            <a href="#" class="btn" onclick="refresh()">🔄 Atualizar</a>
+            <a href="/ping" class="btn" target="_blank" style="background: #28a745;">🎯 Ping</a>
+            <a href="/auth-status" class="btn" target="_blank" style="background: #17a2b8;">📱 Auth</a>
+        </div>
+        
+        <div class="card">
+            <h3>🛠️ Links Úteis</h3>
+            <a href="https://github.com/seujao436/whatsapp-gemini-bot" class="btn" target="_blank">🐈 GitHub</a>
+            <a href="https://github.com/seujao436/keep-alive-service" class="btn" target="_blank">🔄 Keep-Alive</a>
+            <a href="https://render.com" class="btn" target="_blank">☁️ Render</a>
+        </div>
+        
+        <div class="footer">
+            <p>Desenvolvido por <a href="https://github.com/seujao436">seujao436</a></p>
+            <p>Gemini AI • Render.com • WhatsApp Web.js</p>
+        </div>
+    </div>
+    
+    <script>
+        function getStatusClass(status) {
+            if (['conectado', 'autenticado'].includes(status)) return 'online';
+            if (['aguardando_scan', 'aguardando'].includes(status)) return 'waiting';
+            return 'offline';
+        }
+        
+        function getStatusText(status) {
+            const texts = {
+                'conectado': 'Online',
+                'autenticado': 'Conectado',
+                'aguardando_scan': 'Aguardando QR',
+                'aguardando': 'Iniciando',
+                'falha_auth': 'Erro',
+                'desconectado': 'Desconectado'
+            };
+            return texts[status] || 'Offline';
+        }
+        
+        function getInstructions(status) {
+            const instructions = {
+                'conectado': '✅ Bot funcionando! Envie mensagens para o número autenticado.',
+                'autenticado': '✅ WhatsApp conectado com sucesso!',
+                'aguardando_scan': '📱 QR Code disponível nos logs do Render! Acesse Dashboard > Logs.',
+                'aguardando': '⏳ Inicializando... Aguarde alguns segundos.',
+                'falha_auth': '❌ Erro na autenticação. Verifique logs para novo QR.',
+                'desconectado': '🔌 Desconectado. Tentando reconectar...'
+            };
+            return instructions[status] || '⚠️ Status desconhecido. Verifique os logs.';
+        }
+        
+        async function loadData() {
+            try {
+                // Tenta buscar do endpoint atual (substitua pela URL real do seu bot)
+                const baseUrl = window.location.origin;
+                const response = await fetch(baseUrl);
+                
+                if (!response.ok) throw new Error('Erro na resposta');
+                
+                const data = await response.json();
+                
+                // Atualiza estatísticas
+                document.getElementById('messages').textContent = data.stats?.totalMessages || 0;
+                document.getElementById('responses').textContent = data.stats?.responsesGenerated || 0;
+                document.getElementById('uptime').textContent = data.uptime || '-';
+                
+                // Atualiza status
+                const status = data.authenticationStatus || 'offline';
+                const statusText = getStatusText(status);
+                const statusClass = getStatusClass(status);
+                
+                document.getElementById('status').innerHTML = `<span class="status ${statusClass}">${statusText}</span>`;
+                document.getElementById('auth-status').className = `status ${statusClass}`;
+                document.getElementById('auth-status').textContent = statusText;
+                document.getElementById('instructions').textContent = getInstructions(status);
+                
+            } catch (error) {
+                console.error('Erro ao carregar dados:', error);
+                document.getElementById('status').innerHTML = '<span class="status offline">Erro</span>';
+                document.getElementById('instructions').textContent = '❌ Não foi possível conectar ao bot. Verifique se o serviço está rodando.';
+            }
+        }
+        
+        function refresh() {
+            loadData();
+            location.reload();
+        }
+        
+        // Carrega dados iniciais
+        loadData();
+        
+        // Auto-refresh a cada 30 segundos
+        setInterval(loadData, 30000);
+    </script>
+</body>
+</html>
