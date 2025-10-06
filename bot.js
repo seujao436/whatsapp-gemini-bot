@@ -1,4 +1,4 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, NoAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const express = require('express');
@@ -11,11 +11,9 @@ const PORT = process.env.PORT || 10000;
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 
-// Inicializa WhatsApp Client
+// Inicializa WhatsApp Client (sem autenticação persistente para plano free)
 const client = new Client({
-    authStrategy: new LocalAuth({
-        dataPath: './session_data'
-    }),
+    authStrategy: new NoAuth(), // NoAuth para evitar dependência de armazenamento persistente
     puppeteer: {
         args: [
             '--no-sandbox',
@@ -25,8 +23,10 @@ const client = new Client({
             '--no-first-run',
             '--no-zygote',
             '--single-process',
-            '--disable-gpu'
-        ]
+            '--disable-gpu',
+            '--disable-extensions'
+        ],
+        headless: true
     }
 });
 
@@ -38,7 +38,8 @@ let stats = {
     totalMessages: 0,
     responsesGenerated: 0,
     startTime: new Date(),
-    lastMessage: null
+    lastMessage: null,
+    authenticationStatus: 'aguardando'
 };
 
 // Função para gerar resposta com Gemini
@@ -83,26 +84,36 @@ async function generate(prompt, message, chatId) {
 
 // Event listeners do WhatsApp
 client.on('qr', (qr) => {
-    console.log('📱 QR Code gerado! Escaneie com seu WhatsApp:');
+    console.log('\n📱 QR CODE GERADO!');
+    console.log('❗ ATENÇÃO: Escaneie este QR Code com seu WhatsApp:');
+    console.log('\n' + '='.repeat(50));
     qrcode.generate(qr, { small: true });
-    console.log('\n🔄 Aguardando autenticação...');
+    console.log('='.repeat(50));
+    console.log('🔄 Aguardando autenticação...');
+    console.log('⚠️  IMPORTANTE: No plano FREE, você precisará reautenticar a cada restart!');
+    
+    stats.authenticationStatus = 'aguardando_scan';
 });
 
 client.on('ready', () => {
-    console.log('🤖 Bot do WhatsApp está pronto!');
+    console.log('✅ Bot do WhatsApp está pronto!');
     console.log('💬 Aguardando mensagens...');
+    stats.authenticationStatus = 'conectado';
 });
 
 client.on('authenticated', () => {
     console.log('✅ WhatsApp autenticado com sucesso!');
+    stats.authenticationStatus = 'autenticado';
 });
 
 client.on('auth_failure', (msg) => {
     console.error('❌ Falha na autenticação:', msg);
+    stats.authenticationStatus = 'falha_auth';
 });
 
 client.on('disconnected', (reason) => {
     console.log('🔌 Cliente desconectado:', reason);
+    stats.authenticationStatus = 'desconectado';
 });
 
 client.on('message', async (message) => {
@@ -116,7 +127,7 @@ client.on('message', async (message) => {
         
         console.log(`📩 Nova mensagem de ${chatId}: ${messageBody}`);
         
-        // Ignora mensagens de grupos (opcional)
+        // Ignora mensagens de grupos (opcional - descomente para permitir grupos)
         if (message.from.includes('@g.us')) {
             console.log('👥 Mensagem de grupo ignorada');
             return;
@@ -128,12 +139,11 @@ client.on('message', async (message) => {
         }
         
         // Responde automaticamente a todas as mensagens
-        // (remova o if abaixo se quiser responder apenas mensagens com prefixo)
-        if (messageBody) {
+        if (messageBody && messageBody.trim() !== '') {
             await generate(messageBody, message, chatId);
         }
         
-        // Para usar apenas com prefixo .bot, descomente as linhas abaixo:
+        // Para usar apenas com prefixo .bot, substitua o bloco acima por:
         /*
         if (messageBody.startsWith('.bot ')) {
             const query = messageBody.replace('.bot ', '');
@@ -147,6 +157,7 @@ client.on('message', async (message) => {
 });
 
 // Inicializa o cliente
+console.log('🚀 Inicializando cliente WhatsApp...');
 client.initialize();
 
 // Servidor Express para o Render
@@ -159,6 +170,8 @@ app.get('/', (req, res) => {
     
     res.json({
         status: '✅ Bot WhatsApp + Gemini está rodando!',
+        authenticationStatus: stats.authenticationStatus,
+        plan: 'FREE (autenticação temporária)',
         uptime: uptimeFormatted,
         stats: {
             totalMessages: stats.totalMessages,
@@ -171,6 +184,11 @@ app.get('/', (req, res) => {
             '/': 'Status e estatísticas',
             '/ping': 'Health check',
             '/health': 'Status detalhado'
+        },
+        instructions: {
+            authentication: 'Verifique os logs para o QR Code (primeira execução)',
+            usage: 'Envie qualquer mensagem para o número autenticado',
+            note: 'No plano FREE, requer reautenticação a cada restart'
         }
     });
 });
@@ -179,6 +197,7 @@ app.get('/', (req, res) => {
 app.get('/ping', (req, res) => {
     res.json({ 
         status: 'pong', 
+        authStatus: stats.authenticationStatus,
         timestamp: new Date().toISOString(),
         uptime: Math.floor((Date.now() - stats.startTime.getTime()) / 1000)
     });
@@ -186,22 +205,53 @@ app.get('/ping', (req, res) => {
 
 // Endpoint de saúde detalhado
 app.get('/health', (req, res) => {
-    const clientState = client ? 'conectado' : 'desconectado';
+    const clientState = client ? 'inicializado' : 'não inicializado';
     const geminiConfigured = process.env.GEMINI_API_KEY ? 'configurado' : 'não configurado';
     
     res.json({
-        whatsapp: clientState,
+        whatsapp: {
+            client: clientState,
+            authStatus: stats.authenticationStatus
+        },
         gemini: geminiConfigured,
         server: 'online',
         memory: process.memoryUsage(),
+        environment: {
+            nodeVersion: process.version,
+            platform: process.platform,
+            arch: process.arch
+        },
         timestamp: new Date().toISOString()
     });
 });
+
+// Endpoint para status de autenticação
+app.get('/auth-status', (req, res) => {
+    res.json({
+        status: stats.authenticationStatus,
+        message: getAuthMessage(stats.authenticationStatus),
+        timestamp: new Date().toISOString()
+    });
+});
+
+function getAuthMessage(status) {
+    const messages = {
+        'aguardando': 'Inicializando cliente...',
+        'aguardando_scan': 'QR Code gerado! Verifique os logs e escaneie com WhatsApp',
+        'autenticado': 'WhatsApp autenticado com sucesso',
+        'conectado': 'Bot conectado e funcionando',
+        'falha_auth': 'Falha na autenticação. Reescaneie o QR Code',
+        'desconectado': 'Cliente desconectado. Reiniciando...'
+    };
+    return messages[status] || 'Status desconhecido';
+}
 
 // Inicia o servidor
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Servidor Express rodando na porta ${PORT}`);
     console.log(`📊 Dashboard disponível em: http://localhost:${PORT}`);
+    console.log(`⚡ Plano: FREE (autenticação temporária)`);
+    console.log(`🔄 Aguarde o QR Code aparecer nos logs...`);
 });
 
 // Tratamento de erros não capturados
@@ -211,5 +261,21 @@ process.on('unhandledRejection', (reason, promise) => {
 
 process.on('uncaughtException', (error) => {
     console.error('❌ Uncaught Exception:', error);
-    process.exit(1);
+    // Não fazer exit imediato para permitir reconexão
+    setTimeout(() => {
+        process.exit(1);
+    }, 5000);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('🛑 Recebido SIGTERM, encerrando gracefully...');
+    client.destroy();
+    process.exit(0);
+});
+
+process.on('SIGINT', () => {
+    console.log('🛑 Recebido SIGINT, encerrando gracefully...');
+    client.destroy();
+    process.exit(0);
 });
