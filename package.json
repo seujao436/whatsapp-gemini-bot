@@ -19,13 +19,15 @@
     "ai",
     "chatbot",
     "nodejs",
-    "render"
+    "render",
+    "qrcode"
   ],
   "author": "seujao436",
   "license": "MIT",
   "dependencies": {
     "whatsapp-web.js": "^1.23.0",
     "qrcode-terminal": "^0.12.0",
+    "qrcode": "^1.5.3",
     "@google/generative-ai": "^0.17.1",
     "express": "^4.19.2",
     "dotenv": "^16.4.5"
