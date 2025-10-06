@@ -12,7 +12,7 @@ Bot inteligente para WhatsApp integrado com Gemini AI, que mantém contexto de c
 - 🔄 Suporta múltiplas conversas simultâneas
 - 📊 **Dashboard HTML** com monitoramento em tempo real
 - 💰 Custo extremamente baixo (Gemini Flash)
-- 🆓 100% gratuito no Render FREE
+- 🆓 **100% GRATUITO** no Render FREE
 
 ## 🚀 Deploy Rápido
 
@@ -73,22 +73,30 @@ https://seu-bot.onrender.com/
 - Endpoints JSON disponíveis em `/api`
 - Acesso direto via URL do serviço
 
-## ❗ Importante - Plano FREE do Render
+## ❗ IMPORTANTE - Plano FREE do Render
 
-### Limitações do Plano Gratuito:
+### 🎯 Limitações do Plano Gratuito:
 
 - **🔄 Reautenticação Necessária**: A cada restart do serviço, você precisará reescanear o QR Code
-- **💾 Sem Armazenamento Persistente**: Não salva sessão entre restarts
-- **⏰ Sleep Mode**: Serviço dorme após 15 min de inatividade (use [Keep-Alive Service](https://github.com/seujao436/keep-alive-service))
+- **💾 Sem Armazenamento Persistente**: Não salva sessão entre restarts (NoAuth strategy)
+- **⏰ Sleep Mode**: Serviço dorme após 15 min de inatividade
 - **🕑 750h/mês**: Limite de horas mensais do plano free
+- **💰 GRATUITO**: Sem custos de hospedagem
 
-### 🔧 Como Funciona:
+### 🔧 Como Funciona no Plano FREE:
 
 1. **Primeira vez**: QR Code aparece nos logs - escaneie com WhatsApp
 2. **Bot ativo**: Responde mensagens normalmente
 3. **Restart**: Novo QR Code gerado - precisa escanear novamente
-4. **Sleep/Wake**: Use Keep-Alive para manter sempre ativo
+4. **Sleep/Wake**: Use [Keep-Alive Service](https://github.com/seujao436/keep-alive-service) para manter sempre ativo
 5. **Dashboard**: Monitore tudo em tempo real via interface web
+
+### 💡 Dicas para o Plano FREE:
+
+- ✅ Use o [Keep-Alive Service](https://github.com/seujao436/keep-alive-service) para evitar sleep
+- ✅ Monitore via dashboard para saber quando reautenticar
+- ✅ O bot funciona perfeitamente, apenas requer reautenticação ocasional
+- ✅ Custo zero de hospedagem + custo baixíssimo do Gemini AI
 
 ## ⚙️ Configuração
 
@@ -131,7 +139,7 @@ Bot: [Resposta contextual baseada em IA]
 - [whatsapp-web.js](https://wwebjs.dev/) - Biblioteca WhatsApp
 - [Google Gemini](https://ai.google.dev/) - IA Generativa
 - [Express](https://expressjs.com/) - Framework web
-- [Render](https://render.com/) - Hospedagem cloud
+- [Render](https://render.com/) - Hospedagem cloud (FREE)
 
 ## 📊 Endpoints da API
 
@@ -153,7 +161,7 @@ whatsapp-gemini-bot/
 ├── bot.js           # Arquivo principal do bot
 ├── dashboard.html    # Dashboard de monitoramento
 ├── package.json     # Dependências do projeto
-├── render.yaml      # Configuração do Render
+├── render.yaml      # Configuração do Render (FREE)
 ├── .env.example     # Exemplo de variáveis
 ├── .gitignore       # Arquivos ignorados
 └── README.md        # Este arquivo
@@ -197,6 +205,12 @@ render logs -f
 - ✅ Configure UptimeRobot para pingar a cada 12 minutos
 - ✅ Monitore o uptime via dashboard
 
+### Precisa reautenticar frequentemente
+
+- ✅ **Normal no plano FREE**: Não há armazenamento persistente
+- ✅ Use o dashboard para monitorar quando precisa reautenticar
+- ✅ Considere upgrade para plano pago se precisar de sessão persistente
+
 ## 🔄 Manter Sempre Ativo
 
 ### Opção 1: Keep-Alive Service (Recomendado)
@@ -221,6 +235,7 @@ render logs -f
 4. **Grupos**: Por padrão, ignora mensagens de grupos (modificável)
 5. **Reautenticação**: É normal no plano FREE - monitore via dashboard
 6. **Logs**: Dashboard fornece links diretos para logs do Render
+7. **Plano FREE**: Funciona perfeitamente, apenas requer reautenticação ocasional
 
 ## ⚙️ Customizações
 
@@ -289,5 +304,7 @@ Desenvolvido com ❤️ usando:
 ---
 
 **⭐ Se este projeto te ajudou, deixe uma estrela no GitHub!**
+
+**🆓 100% GRATUITO no plano FREE do Render + Gemini AI de baixo custo!**
 
 **🌐 Acesse o dashboard após o deploy para monitoramento em tempo real!**
