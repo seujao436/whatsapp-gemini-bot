@@ -1,9 +1,8 @@
 const { Client, NoAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const qrcode = require('qrcode');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const express = require('express');
 const path = require('path');
-const QRCode = require('qrcode'); // Para gerar QR Code como imagem
 require('dotenv').config();
 
 const app = express();
@@ -13,9 +12,27 @@ const PORT = process.env.PORT || 10000;
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
 
-// Inicializa WhatsApp Client (sem autenticação persistente para plano free)
+// Estados dos chats
+const chatStates = new Map(); // chatId -> { active: boolean, systemPrompt: string, messages: [] }
+const DEFAULT_SYSTEM_PROMPT = "Você é um assistente útil e amigável. Responda de forma clara e prestativa em português brasileiro.";
+
+// Estatísticas globais
+const stats = {
+    totalMessages: 0,
+    totalChats: 0,
+    activeChats: 0,
+    startTime: Date.now(),
+    lastActivity: Date.now(),
+    qrCode: null,
+    qrCodeExpired: false,
+    lastQrTime: null,
+    isAuthenticated: false,
+    connectionStatus: 'disconnected'
+};
+
+// Inicializa WhatsApp Client
 const client = new Client({
-    authStrategy: new NoAuth(), // NoAuth para evitar dependência de armazenamento persistente
+    authStrategy: new NoAuth(),
     puppeteer: {
         args: [
             '--no-sandbox',
@@ -24,303 +41,350 @@ const client = new Client({
             '--disable-accelerated-2d-canvas',
             '--no-first-run',
             '--no-zygote',
-            '--single-process',
-            '--disable-gpu',
-            '--disable-extensions'
-        ],
-        headless: true
+            '--disable-gpu'
+        ]
     }
 });
 
-// Armazena contexto das conversas (máximo 20 mensagens por chat)
-const conversationContext = new Map();
+// Função para obter ou criar estado do chat
+function getChatState(chatId) {
+    if (!chatStates.has(chatId)) {
+        chatStates.set(chatId, {
+            active: false, // Por padrão, novos chats começam desativados
+            systemPrompt: DEFAULT_SYSTEM_PROMPT,
+            messages: []
+        });
+        stats.totalChats++;
+    }
+    return chatStates.get(chatId);
+}
 
-// Estatísticas do bot e QR Code
-let stats = {
-    totalMessages: 0,
-    responsesGenerated: 0,
-    startTime: new Date(),
-    lastMessage: null,
-    authenticationStatus: 'aguardando',
-    qrCode: null, // Armazena o QR code como base64
-    qrCodeExpired: false,
-    lastQrTime: null
-};
+// Função para contar chats ativos
+function updateActiveChatsCount() {
+    let active = 0;
+    for (const [chatId, state] of chatStates) {
+        if (state.active) active++;
+    }
+    stats.activeChats = active;
+}
 
-// Função para gerar resposta com Gemini
+// Função para gerar resposta com Gemini usando contexto completo
 async function generate(prompt, message, chatId) {
     try {
-        // Recupera contexto da conversa
-        const context = conversationContext.get(chatId) || [];
+        const chatState = getChatState(chatId);
+        const systemPrompt = chatState.systemPrompt;
         
-        // Monta prompt com contexto
-        const contextPrompt = context.length > 0 
-            ? `Contexto da conversa anterior:\n${context.join('\n')}\n\nNova mensagem: ${prompt}`
-            : prompt;
-            
-        const result = await model.generateContent(contextPrompt);
+        // Constrói o contexto completo da conversa
+        let contextMessages = chatState.messages.slice(-50); // Últimas 50 mensagens para não ultrapassar limites
+        let contextString = contextMessages.map(msg => `${msg.sender}: ${msg.text}`).join('\n');
+        
+        // Prompt completo com sistema + contexto + nova mensagem
+        const fullPrompt = `${systemPrompt}\n\nContexto da conversa:\n${contextString}\n\nUsuário: ${prompt}`;
+        
+        const result = await model.generateContent(fullPrompt);
         const response = await result.response;
         const text = response.text();
         
-        // Atualiza contexto
-        context.push(`Usuário: ${prompt}`);
-        context.push(`Bot: ${text}`);
+        // Adiciona mensagens ao contexto
+        chatState.messages.push(
+            { sender: 'Usuário', text: prompt, timestamp: new Date() },
+            { sender: 'Bot', text: text, timestamp: new Date() }
+        );
         
-        // Mantém apenas as últimas 20 mensagens no contexto
-        if (context.length > 20) {
-            context.splice(0, context.length - 20);
-        }
-        
-        conversationContext.set(chatId, context);
-        
-        // Envia resposta
         await message.reply(text);
         
-        // Atualiza estatísticas
-        stats.responsesGenerated++;
-        stats.lastMessage = new Date();
+        stats.totalMessages++;
+        stats.lastActivity = Date.now();
         
-        console.log(`✅ Resposta enviada para ${chatId}: ${text.substring(0, 50)}...`);
+        console.log(`✅ Resposta enviada para ${chatId}`);
     } catch (error) {
         console.error('❌ Erro ao gerar resposta:', error);
-        await message.reply('Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente em alguns momentos.');
+        await message.reply('Desculpe, ocorreu um erro ao processar sua mensagem. Tente novamente em alguns instantes.');
     }
 }
 
 // Event listeners do WhatsApp
 client.on('qr', async (qr) => {
-    console.log('\n📱 QR CODE GERADO!');
-    console.log('❗ ATENÇÃO: Escaneie este QR Code com seu WhatsApp:');
-    console.log('\n' + '='.repeat(50));
-    qrcode.generate(qr, { small: true });
-    console.log('='.repeat(50));
-    console.log('🔄 Aguardando autenticação...');
-    console.log('⚠️  IMPORTANTE: No plano FREE, você precisará reautenticar a cada restart!');
-    console.log(`🌐 QR Code também disponível no dashboard: http://localhost:${PORT}`);
-    
     try {
-        // Gera QR Code como imagem base64 para exibir no HTML
-        const qrCodeDataURL = await QRCode.toDataURL(qr, {
-            width: 256,
-            margin: 2,
+        // Gera QR code como imagem base64
+        const qrImage = await qrcode.toDataURL(qr, {
+            errorCorrectionLevel: 'M',
+            type: 'image/png',
+            quality: 0.92,
+            margin: 1,
             color: {
                 dark: '#000000',
                 light: '#FFFFFF'
             }
         });
         
-        stats.qrCode = qrCodeDataURL;
+        stats.qrCode = qrImage;
         stats.qrCodeExpired = false;
-        stats.lastQrTime = new Date();
+        stats.lastQrTime = Date.now();
+        stats.connectionStatus = 'aguardando_scan';
         
-        console.log('✅ QR Code gerado para o dashboard!');
+        console.log('📱 QR Code gerado! Acesse o dashboard para escanear');
+        console.log('🌐 Dashboard: https://seu-bot.onrender.com');
     } catch (error) {
-        console.error('❌ Erro ao gerar QR Code para dashboard:', error);
+        console.error('❌ Erro ao gerar QR Code:', error);
     }
-    
-    stats.authenticationStatus = 'aguardando_scan';
 });
 
 client.on('ready', () => {
-    console.log('✅ Bot do WhatsApp está pronto!');
-    console.log('💬 Aguardando mensagens...');
-    stats.authenticationStatus = 'conectado';
-    stats.qrCode = null; // Remove QR code quando conectado
+    console.log('🤖 Bot do WhatsApp está pronto!');
+    stats.isAuthenticated = true;
+    stats.connectionStatus = 'conectado';
+    stats.qrCode = null; // Remove QR Code quando conectado
     stats.qrCodeExpired = false;
 });
 
 client.on('authenticated', () => {
     console.log('✅ WhatsApp autenticado com sucesso!');
-    stats.authenticationStatus = 'autenticado';
-    stats.qrCode = null; // Remove QR code quando autenticado
-    stats.qrCodeExpired = false;
+    stats.isAuthenticated = true;
+    stats.connectionStatus = 'conectado';
 });
 
-client.on('auth_failure', (msg) => {
-    console.error('❌ Falha na autenticação:', msg);
-    stats.authenticationStatus = 'falha_auth';
+client.on('auth_failure', () => {
+    console.log('❌ Falha na autenticação');
+    stats.isAuthenticated = false;
+    stats.connectionStatus = 'erro_auth';
     stats.qrCodeExpired = true;
 });
 
 client.on('disconnected', (reason) => {
     console.log('🔌 Cliente desconectado:', reason);
-    stats.authenticationStatus = 'desconectado';
-    stats.qrCode = null;
+    stats.isAuthenticated = false;
+    stats.connectionStatus = 'desconectado';
 });
 
 client.on('message', async (message) => {
     try {
-        // Atualiza estatísticas
-        stats.totalMessages++;
-        stats.lastMessage = new Date();
-        
         const chatId = message.from;
-        const messageBody = message.body;
+        const messageBody = message.body?.trim();
         
-        console.log(`📩 Nova mensagem de ${chatId}: ${messageBody}`);
-        
-        // Ignora mensagens de grupos (opcional - descomente para permitir grupos)
+        // Ignora mensagens de grupos (opcional - pode ser removido)
         if (message.from.includes('@g.us')) {
             console.log('👥 Mensagem de grupo ignorada');
             return;
         }
         
-        // Ignora mensagens próprias
-        if (message.fromMe) {
+        // Ignora mensagens vazias
+        if (!messageBody) return;
+        
+        console.log(`📨 Mensagem recebida de ${chatId}: ${messageBody}`);
+        
+        const chatState = getChatState(chatId);
+        
+        // Comando: /bot (toggle ativo/inativo)
+        if (messageBody === '/bot') {
+            chatState.active = !chatState.active;
+            updateActiveChatsCount();
+            
+            if (chatState.active) {
+                await message.reply('✅ Bot ATIVADO neste chat!\nAgora vou responder suas mensagens.');
+            } else {
+                await message.reply('❌ Bot DESATIVADO neste chat.\nUse /bot para reativar.');
+            }
             return;
         }
         
-        // Responde automaticamente a todas as mensagens
-        if (messageBody && messageBody.trim() !== '') {
+        // Comando: /bot status
+        if (messageBody === '/bot status') {
+            const status = chatState.active ? 'ATIVO ✅' : 'DESATIVADO ❌';
+            const instruction = chatState.active ? 
+                'Bot respondendo mensagens normalmente.' : 
+                'Use /bot para ativar.';
+            
+            await message.reply(`📊 Status: ${status}\n${instruction}`);
+            return;
+        }
+        
+        // Comando: /prompt [texto] (definir novo system prompt)
+        if (messageBody.startsWith('/prompt ')) {
+            const newPrompt = messageBody.replace('/prompt ', '').trim();
+            
+            if (newPrompt.length === 0) {
+                await message.reply('❌ Prompt não pode ser vazio.\n\nUso: /prompt [seu texto aqui]');
+                return;
+            }
+            
+            if (newPrompt.length > 1000) {
+                await message.reply('❌ Prompt muito longo (máximo 1000 caracteres).');
+                return;
+            }
+            
+            const oldPrompt = chatState.systemPrompt;
+            chatState.systemPrompt = newPrompt;
+            
+            // Adiciona a mudança de prompt ao contexto
+            chatState.messages.push({
+                sender: 'Sistema',
+                text: `Prompt alterado para: "${newPrompt}"`,
+                timestamp: new Date()
+            });
+            
+            const now = new Date().toLocaleString('pt-BR');
+            await message.reply(
+                `✅ System prompt alterado!\n\n` +
+                `📋 PROMPT ANTERIOR:\n"${oldPrompt}"\n\n` +
+                `🆕 NOVO PROMPT:\n"${newPrompt}"\n\n` +
+                `🕒 Alterado em: ${now}`
+            );
+            return;
+        }
+        
+        // Comando: /prompt show (mostrar prompt atual)
+        if (messageBody === '/prompt show') {
+            await message.reply(`📋 PROMPT ATUAL:\n"${chatState.systemPrompt}"`);
+            return;
+        }
+        
+        // Comando: /prompt reset (voltar ao prompt padrão)
+        if (messageBody === '/prompt reset') {
+            const oldPrompt = chatState.systemPrompt;
+            chatState.systemPrompt = DEFAULT_SYSTEM_PROMPT;
+            
+            chatState.messages.push({
+                sender: 'Sistema',
+                text: 'Prompt resetado para padrão',
+                timestamp: new Date()
+            });
+            
+            await message.reply(
+                `✅ Prompt resetado para o padrão!\n\n` +
+                `📋 PROMPT ANTERIOR:\n"${oldPrompt}"\n\n` +
+                `🆕 PROMPT ATUAL:\n"${DEFAULT_SYSTEM_PROMPT}"`
+            );
+            return;
+        }
+        
+        // Processa mensagens normais apenas se o bot estiver ativo
+        if (chatState.active && messageBody) {
+            console.log(`🤖 Processando mensagem de chat ativo: ${chatId}`);
             await generate(messageBody, message, chatId);
         }
         
-        // Para usar apenas com prefixo .bot, substitua o bloco acima por:
-        /*
-        if (messageBody.startsWith('.bot ')) {
-            const query = messageBody.replace('.bot ', '');
-            await generate(query, message, chatId);
-        }
-        */
-        
     } catch (error) {
-        console.error('❌ Erro ao processar mensagem:', error);
+        console.error('❌ Erro no processamento da mensagem:', error);
     }
 });
 
-// Inicializa o cliente
-console.log('🚀 Inicializando cliente WhatsApp...');
+// Inicializa cliente
+console.log('🔄 Inicializando WhatsApp Client...');
 client.initialize();
 
-// Servidor Express para o Render
-app.use(express.json());
-app.use(express.static(path.join(__dirname))); // Serve arquivos estáticos (incluindo dashboard.html)
+// Configurar Express para servir arquivos estáticos
+app.use(express.static(path.join(__dirname)));
 
-// Endpoint principal - serve o dashboard HTML
+// Rota principal - Dashboard HTML
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'dashboard.html'));
 });
 
-// Endpoint JSON com estatísticas (para API)
+// API - Dados JSON
 app.get('/api', (req, res) => {
-    const uptime = Math.floor((Date.now() - stats.startTime.getTime()) / 1000);
-    const uptimeFormatted = `${Math.floor(uptime / 3600)}h ${Math.floor((uptime % 3600) / 60)}m ${uptime % 60}s`;
+    const uptime = Date.now() - stats.startTime;
+    const uptimeFormatted = formatUptime(uptime);
+    
+    // Estatísticas dos chats
+    const chatsInfo = [];
+    for (const [chatId, state] of chatStates) {
+        const phone = chatId.replace('@c.us', '');
+        chatsInfo.push({
+            phone: phone,
+            active: state.active,
+            customPrompt: state.systemPrompt !== DEFAULT_SYSTEM_PROMPT,
+            promptPreview: state.systemPrompt.substring(0, 50) + (state.systemPrompt.length > 50 ? '...' : ''),
+            messageCount: state.messages.length
+        });
+    }
     
     res.json({
-        status: '✅ Bot WhatsApp + Gemini está rodando!',
-        authenticationStatus: stats.authenticationStatus,
-        plan: 'FREE (autenticação temporária)',
+        status: 'online',
         uptime: uptimeFormatted,
-        qrCode: stats.qrCode, // Inclui QR code base64
+        timestamp: new Date().toLocaleString('pt-BR'),
+        authenticated: stats.isAuthenticated,
+        connectionStatus: stats.connectionStatus,
+        qrCodeAvailable: !!stats.qrCode,
         qrCodeExpired: stats.qrCodeExpired,
-        lastQrTime: stats.lastQrTime,
         stats: {
             totalMessages: stats.totalMessages,
-            responsesGenerated: stats.responsesGenerated,
-            lastMessage: stats.lastMessage,
-            activeChats: conversationContext.size
+            totalChats: stats.totalChats,
+            activeChats: stats.activeChats,
+            inactiveChats: stats.totalChats - stats.activeChats,
+            customPrompts: chatsInfo.filter(chat => chat.customPrompt).length
         },
-        timestamp: new Date().toLocaleString('pt-BR'),
-        endpoints: {
-            '/': 'Dashboard HTML',
-            '/api': 'Status JSON',
-            '/ping': 'Health check',
-            '/health': 'Status detalhado'
-        },
-        instructions: {
-            authentication: 'QR Code disponível no dashboard quando necessário',
-            usage: 'Envie qualquer mensagem para o número autenticado',
-            note: 'No plano FREE, requer reautenticação a cada restart'
-        }
+        chats: chatsInfo,
+        commands: [
+            '/bot - Liga/desliga bot (toggle)',
+            '/bot status - Mostra status',
+            '/prompt [texto] - Define novo prompt',
+            '/prompt show - Mostra prompt atual',
+            '/prompt reset - Reseta prompt'
+        ]
     });
 });
 
-// Health check endpoint
+// Endpoint para obter QR Code
+app.get('/qr-code', (req, res) => {
+    if (stats.qrCode && !stats.qrCodeExpired) {
+        res.json({
+            success: true,
+            qrCode: stats.qrCode,
+            timestamp: stats.lastQrTime
+        });
+    } else {
+        res.json({
+            success: false,
+            message: stats.qrCodeExpired ? 'QR Code expirado' : 'QR Code não disponível',
+            connectionStatus: stats.connectionStatus
+        });
+    }
+});
+
+// Health checks
 app.get('/ping', (req, res) => {
-    res.json({ 
-        status: 'pong', 
-        authStatus: stats.authenticationStatus,
-        timestamp: new Date().toISOString(),
-        uptime: Math.floor((Date.now() - stats.startTime.getTime()) / 1000)
-    });
+    res.status(200).send('pong');
 });
 
-// Endpoint de saúde detalhado
 app.get('/health', (req, res) => {
-    const clientState = client ? 'inicializado' : 'não inicializado';
-    const geminiConfigured = process.env.GEMINI_API_KEY ? 'configurado' : 'não configurado';
+    res.json({
+        status: 'healthy',
+        uptime: Date.now() - stats.startTime,
+        authenticated: stats.isAuthenticated,
+        connectionStatus: stats.connectionStatus,
+        activeChats: stats.activeChats
+    });
+});
+
+// Função para formatar uptime
+function formatUptime(ms) {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
     
-    res.json({
-        whatsapp: {
-            client: clientState,
-            authStatus: stats.authenticationStatus
-        },
-        gemini: geminiConfigured,
-        server: 'online',
-        memory: process.memoryUsage(),
-        environment: {
-            nodeVersion: process.version,
-            platform: process.platform,
-            arch: process.arch
-        },
-        timestamp: new Date().toISOString()
-    });
-});
-
-// Endpoint para status de autenticação
-app.get('/auth-status', (req, res) => {
-    res.json({
-        status: stats.authenticationStatus,
-        message: getAuthMessage(stats.authenticationStatus),
-        qrCode: stats.qrCode,
-        qrCodeExpired: stats.qrCodeExpired,
-        timestamp: new Date().toISOString()
-    });
-});
-
-function getAuthMessage(status) {
-    const messages = {
-        'aguardando': 'Inicializando cliente...',
-        'aguardando_scan': 'QR Code gerado! Escaneie com seu WhatsApp',
-        'autenticado': 'WhatsApp autenticado com sucesso',
-        'conectado': 'Bot conectado e funcionando',
-        'falha_auth': 'Falha na autenticação. Novo QR Code será gerado',
-        'desconectado': 'Cliente desconectado. Reiniciando...'
-    };
-    return messages[status] || 'Status desconhecido';
+    if (days > 0) return `${days}d ${hours % 24}h ${minutes % 60}m`;
+    if (hours > 0) return `${hours}h ${minutes % 60}m`;
+    if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+    return `${seconds}s`;
 }
 
-// Inicia o servidor
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Servidor Express rodando na porta ${PORT}`);
-    console.log(`🌐 Dashboard HTML disponível em: http://localhost:${PORT}`);
-    console.log(`📊 API JSON disponível em: http://localhost:${PORT}/api`);
-    console.log(`⚡ Plano: FREE (autenticação temporária)`);
-    console.log(`🔄 Aguarde o QR Code aparecer nos logs E no dashboard...`);
-});
-
-// Tratamento de erros não capturados
-process.on('unhandledRejection', (reason, promise) => {
-    console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason);
-});
-
-process.on('uncaughtException', (error) => {
-    console.error('❌ Uncaught Exception:', error);
-    // Não fazer exit imediato para permitir reconexão
-    setTimeout(() => {
-        process.exit(1);
-    }, 5000);
-});
-
 // Graceful shutdown
-process.on('SIGTERM', () => {
-    console.log('🛑 Recebido SIGTERM, encerrando gracefully...');
-    client.destroy();
+process.on('SIGINT', async () => {
+    console.log('🔄 Encerrando bot...');
+    await client.destroy();
     process.exit(0);
 });
 
-process.on('SIGINT', () => {
-    console.log('🛑 Recebido SIGINT, encerrando gracefully...');
-    client.destroy();
+process.on('SIGTERM', async () => {
+    console.log('🔄 Encerrando bot...');
+    await client.destroy();
     process.exit(0);
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🌐 Servidor rodando na porta ${PORT}`);
+    console.log(`📊 Dashboard: http://localhost:${PORT}`);
+    console.log(`🔌 API: http://localhost:${PORT}/api`);
 });
