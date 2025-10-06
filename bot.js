@@ -3,6 +3,7 @@ const qrcode = require('qrcode-terminal');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const express = require('express');
 const path = require('path');
+const QRCode = require('qrcode'); // Para gerar QR Code como imagem
 require('dotenv').config();
 
 const app = express();
@@ -34,13 +35,16 @@ const client = new Client({
 // Armazena contexto das conversas (máximo 20 mensagens por chat)
 const conversationContext = new Map();
 
-// Estatísticas do bot
+// Estatísticas do bot e QR Code
 let stats = {
     totalMessages: 0,
     responsesGenerated: 0,
     startTime: new Date(),
     lastMessage: null,
-    authenticationStatus: 'aguardando'
+    authenticationStatus: 'aguardando',
+    qrCode: null, // Armazena o QR code como base64
+    qrCodeExpired: false,
+    lastQrTime: null
 };
 
 // Função para gerar resposta com Gemini
@@ -84,7 +88,7 @@ async function generate(prompt, message, chatId) {
 }
 
 // Event listeners do WhatsApp
-client.on('qr', (qr) => {
+client.on('qr', async (qr) => {
     console.log('\n📱 QR CODE GERADO!');
     console.log('❗ ATENÇÃO: Escaneie este QR Code com seu WhatsApp:');
     console.log('\n' + '='.repeat(50));
@@ -92,6 +96,27 @@ client.on('qr', (qr) => {
     console.log('='.repeat(50));
     console.log('🔄 Aguardando autenticação...');
     console.log('⚠️  IMPORTANTE: No plano FREE, você precisará reautenticar a cada restart!');
+    console.log(`🌐 QR Code também disponível no dashboard: http://localhost:${PORT}`);
+    
+    try {
+        // Gera QR Code como imagem base64 para exibir no HTML
+        const qrCodeDataURL = await QRCode.toDataURL(qr, {
+            width: 256,
+            margin: 2,
+            color: {
+                dark: '#000000',
+                light: '#FFFFFF'
+            }
+        });
+        
+        stats.qrCode = qrCodeDataURL;
+        stats.qrCodeExpired = false;
+        stats.lastQrTime = new Date();
+        
+        console.log('✅ QR Code gerado para o dashboard!');
+    } catch (error) {
+        console.error('❌ Erro ao gerar QR Code para dashboard:', error);
+    }
     
     stats.authenticationStatus = 'aguardando_scan';
 });
@@ -100,21 +125,27 @@ client.on('ready', () => {
     console.log('✅ Bot do WhatsApp está pronto!');
     console.log('💬 Aguardando mensagens...');
     stats.authenticationStatus = 'conectado';
+    stats.qrCode = null; // Remove QR code quando conectado
+    stats.qrCodeExpired = false;
 });
 
 client.on('authenticated', () => {
     console.log('✅ WhatsApp autenticado com sucesso!');
     stats.authenticationStatus = 'autenticado';
+    stats.qrCode = null; // Remove QR code quando autenticado
+    stats.qrCodeExpired = false;
 });
 
 client.on('auth_failure', (msg) => {
     console.error('❌ Falha na autenticação:', msg);
     stats.authenticationStatus = 'falha_auth';
+    stats.qrCodeExpired = true;
 });
 
 client.on('disconnected', (reason) => {
     console.log('🔌 Cliente desconectado:', reason);
     stats.authenticationStatus = 'desconectado';
+    stats.qrCode = null;
 });
 
 client.on('message', async (message) => {
@@ -180,6 +211,9 @@ app.get('/api', (req, res) => {
         authenticationStatus: stats.authenticationStatus,
         plan: 'FREE (autenticação temporária)',
         uptime: uptimeFormatted,
+        qrCode: stats.qrCode, // Inclui QR code base64
+        qrCodeExpired: stats.qrCodeExpired,
+        lastQrTime: stats.lastQrTime,
         stats: {
             totalMessages: stats.totalMessages,
             responsesGenerated: stats.responsesGenerated,
@@ -194,7 +228,7 @@ app.get('/api', (req, res) => {
             '/health': 'Status detalhado'
         },
         instructions: {
-            authentication: 'Verifique os logs para o QR Code (primeira execução)',
+            authentication: 'QR Code disponível no dashboard quando necessário',
             usage: 'Envie qualquer mensagem para o número autenticado',
             note: 'No plano FREE, requer reautenticação a cada restart'
         }
@@ -238,6 +272,8 @@ app.get('/auth-status', (req, res) => {
     res.json({
         status: stats.authenticationStatus,
         message: getAuthMessage(stats.authenticationStatus),
+        qrCode: stats.qrCode,
+        qrCodeExpired: stats.qrCodeExpired,
         timestamp: new Date().toISOString()
     });
 });
@@ -245,10 +281,10 @@ app.get('/auth-status', (req, res) => {
 function getAuthMessage(status) {
     const messages = {
         'aguardando': 'Inicializando cliente...',
-        'aguardando_scan': 'QR Code gerado! Verifique os logs e escaneie com WhatsApp',
+        'aguardando_scan': 'QR Code gerado! Escaneie com seu WhatsApp',
         'autenticado': 'WhatsApp autenticado com sucesso',
         'conectado': 'Bot conectado e funcionando',
-        'falha_auth': 'Falha na autenticação. Reescaneie o QR Code',
+        'falha_auth': 'Falha na autenticação. Novo QR Code será gerado',
         'desconectado': 'Cliente desconectado. Reiniciando...'
     };
     return messages[status] || 'Status desconhecido';
@@ -260,7 +296,7 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`🌐 Dashboard HTML disponível em: http://localhost:${PORT}`);
     console.log(`📊 API JSON disponível em: http://localhost:${PORT}/api`);
     console.log(`⚡ Plano: FREE (autenticação temporária)`);
-    console.log(`🔄 Aguarde o QR Code aparecer nos logs...`);
+    console.log(`🔄 Aguarde o QR Code aparecer nos logs E no dashboard...`);
 });
 
 // Tratamento de erros não capturados
