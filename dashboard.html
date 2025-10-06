@@ -51,6 +51,12 @@
             opacity: 0.8;
         }
         .footer a { color: white; }
+        .free-plan {
+            background: #e8f5e8; border: 2px solid #28a745;
+            border-radius: 10px; padding: 15px; margin: 20px 0;
+            text-align: center;
+        }
+        .free-plan h4 { color: #28a745; margin: 0 0 10px 0; }
         @media (max-width: 768px) {
             .stats { grid-template-columns: 1fr; }
             .header h1 { font-size: 2rem; }
@@ -61,7 +67,12 @@
     <div class="container">
         <div class="header">
             <h1>🤖 WhatsApp + Gemini Bot</h1>
-            <p>Dashboard de Monitoramento</p>
+            <p>Dashboard de Monitoramento em Tempo Real</p>
+        </div>
+        
+        <div class="free-plan">
+            <h4>🆓 PLANO FREE ATIVO</h4>
+            <p>Funcionando 100% gratuito no Render! Requer reautenticação apenas em restarts.</p>
         </div>
         
         <div class="stats">
@@ -91,21 +102,28 @@
             <h3>📱 Autenticação WhatsApp</h3>
             <p>Status: <span id="auth-status" class="status waiting">Carregando...</span></p>
             <div class="instructions" id="instructions">Verificando status...</div>
-            <a href="#" class="btn" onclick="refresh()">🔄 Atualizar</a>
-            <a href="/ping" class="btn" target="_blank" style="background: #28a745;">🎯 Ping</a>
-            <a href="/auth-status" class="btn" target="_blank" style="background: #17a2b8;">📱 Auth</a>
+            <div style="margin-top: 15px;">
+                <a href="#" class="btn" onclick="refresh()">🔄 Atualizar</a>
+                <a href="/ping" class="btn" target="_blank" style="background: #28a745;">🎯 Ping</a>
+                <a href="/auth-status" class="btn" target="_blank" style="background: #17a2b8;">📱 Auth</a>
+                <a href="/api" class="btn" target="_blank" style="background: #ffc107; color: #000;">📊 API</a>
+            </div>
         </div>
         
         <div class="card">
             <h3>🛠️ Links Úteis</h3>
-            <a href="https://github.com/seujao436/whatsapp-gemini-bot" class="btn" target="_blank">🐈 GitHub</a>
-            <a href="https://github.com/seujao436/keep-alive-service" class="btn" target="_blank">🔄 Keep-Alive</a>
-            <a href="https://render.com" class="btn" target="_blank">☁️ Render</a>
+            <div>
+                <a href="https://github.com/seujao436/whatsapp-gemini-bot" class="btn" target="_blank">🐈 GitHub Bot</a>
+                <a href="https://github.com/seujao436/keep-alive-service" class="btn" target="_blank">🔄 Keep-Alive</a>
+                <a href="https://render.com" class="btn" target="_blank">☁️ Render</a>
+                <a href="https://aistudio.google.com/app/apikey" class="btn" target="_blank" style="background: #db4437;">🤖 Gemini API</a>
+            </div>
         </div>
         
         <div class="footer">
             <p>Desenvolvido por <a href="https://github.com/seujao436">seujao436</a></p>
-            <p>Gemini AI • Render.com • WhatsApp Web.js</p>
+            <p>Gemini AI • Render.com (FREE) • WhatsApp Web.js</p>
+            <p><small>Atualização automática a cada 30 segundos</small></p>
         </div>
     </div>
     
@@ -142,9 +160,9 @@
         
         async function loadData() {
             try {
-                // Tenta buscar do endpoint atual (substitua pela URL real do seu bot)
+                // Busca dados do endpoint API
                 const baseUrl = window.location.origin;
-                const response = await fetch(baseUrl);
+                const response = await fetch(`${baseUrl}/api`);
                 
                 if (!response.ok) throw new Error('Erro na resposta');
                 
@@ -165,6 +183,8 @@
                 document.getElementById('auth-status').textContent = statusText;
                 document.getElementById('instructions').textContent = getInstructions(status);
                 
+                console.log('Dashboard atualizado:', new Date().toLocaleTimeString());
+                
             } catch (error) {
                 console.error('Erro ao carregar dados:', error);
                 document.getElementById('status').innerHTML = '<span class="status offline">Erro</span>';
@@ -173,15 +193,19 @@
         }
         
         function refresh() {
+            console.log('Atualizando dashboard...');
             loadData();
-            location.reload();
         }
         
         // Carrega dados iniciais
+        console.log('Inicializando dashboard...');
         loadData();
         
         // Auto-refresh a cada 30 segundos
-        setInterval(loadData, 30000);
+        setInterval(() => {
+            console.log('Auto-refresh...');
+            loadData();
+        }, 30000);
     </script>
 </body>
 </html>
