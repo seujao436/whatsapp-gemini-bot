@@ -1,7 +1,7 @@
 {
   "name": "whatsapp-gemini-live-bot",
-  "version": "2.0.0",
-  "description": "Bot WhatsApp inteligente com Gemini Live AI - suporte completo a áudio e voz",
+  "version": "2.5.0",
+  "description": "Bot WhatsApp com Gemini Live API - áudio nativo direto (lógica do alternativedialogue)",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js",
@@ -11,13 +11,16 @@
     "whatsapp",
     "gemini",
     "gemini-live",
+    "gemini-2.0-flash-exp",
     "ai",
     "bot",
     "chatbot",
     "audio",
     "voice",
+    "native-audio",
     "tts",
     "speech",
+    "alternativedialogue",
     "render"
   ],
   "author": "seujao436",
