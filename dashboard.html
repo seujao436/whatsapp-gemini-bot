@@ -46,6 +46,25 @@
             background: #f8f9fa; padding: 15px; border-radius: 8px;
             margin: 15px 0; border-left: 4px solid #667eea;
         }
+        .qr-section {
+            background: white; border-radius: 15px; padding: 20px;
+            margin-bottom: 20px; text-align: center;
+            border: 2px dashed #667eea;
+        }
+        .qr-code {
+            max-width: 256px; margin: 15px auto;
+            padding: 10px; background: white;
+            border: 2px solid #667eea; border-radius: 10px;
+        }
+        .qr-code img { width: 100%; height: auto; }
+        .qr-expired {
+            background: #f8d7da; border-color: #dc3545;
+            color: #721c24;
+        }
+        .qr-waiting {
+            background: #d1ecf1; border-color: #17a2b8;
+            color: #0c5460;
+        }
         .footer {
             text-align: center; color: white; margin-top: 30px;
             opacity: 0.8;
@@ -57,6 +76,7 @@
             text-align: center;
         }
         .free-plan h4 { color: #28a745; margin: 0 0 10px 0; }
+        .hidden { display: none; }
         @media (max-width: 768px) {
             .stats { grid-template-columns: 1fr; }
             .header h1 { font-size: 2rem; }
@@ -72,7 +92,23 @@
         
         <div class="free-plan">
             <h4>🆓 PLANO FREE ATIVO</h4>
-            <p>Funcionando 100% gratuito no Render! Requer reautenticação apenas em restarts.</p>
+            <p>Funcionando 100% gratuito no Render! QR Code aparece aqui quando necessário.</p>
+        </div>
+        
+        <!-- Seção do QR Code -->
+        <div id="qr-section" class="qr-section hidden">
+            <h3>📱 QR Code para Autenticação</h3>
+            <p id="qr-message">Escaneie o QR Code abaixo com seu WhatsApp</p>
+            <div id="qr-code" class="qr-code">
+                <img id="qr-image" src="" alt="QR Code para WhatsApp" />
+            </div>
+            <div class="instructions">
+                📱 <strong>Como escanear:</strong><br>
+                1. Abra o WhatsApp no seu celular<br>
+                2. Toque em "Mais opções" (três pontos)<br>
+                3. Toque em "WhatsApp Web"<br>
+                4. Aponte a câmera para o QR Code acima
+            </div>
         </div>
         
         <div class="stats">
@@ -99,7 +135,7 @@
         </div>
         
         <div class="auth-section">
-            <h3>📱 Autenticação WhatsApp</h3>
+            <h3>📱 Status de Autenticação</h3>
             <p>Status: <span id="auth-status" class="status waiting">Carregando...</span></p>
             <div class="instructions" id="instructions">Verificando status...</div>
             <div style="margin-top: 15px;">
@@ -150,12 +186,40 @@
             const instructions = {
                 'conectado': '✅ Bot funcionando! Envie mensagens para o número autenticado.',
                 'autenticado': '✅ WhatsApp conectado com sucesso!',
-                'aguardando_scan': '📱 QR Code disponível nos logs do Render! Acesse Dashboard > Logs.',
-                'aguardando': '⏳ Inicializando... Aguarde alguns segundos.',
-                'falha_auth': '❌ Erro na autenticação. Verifique logs para novo QR.',
+                'aguardando_scan': '📱 QR Code exibido acima! Escaneie com seu WhatsApp.',
+                'aguardando': '⏳ Inicializando... QR Code aparecerá em breve.',
+                'falha_auth': '❌ Erro na autenticação. Novo QR Code será gerado.',
                 'desconectado': '🔌 Desconectado. Tentando reconectar...'
             };
             return instructions[status] || '⚠️ Status desconhecido. Verifique os logs.';
+        }
+        
+        function updateQRCode(data) {
+            const qrSection = document.getElementById('qr-section');
+            const qrImage = document.getElementById('qr-image');
+            const qrMessage = document.getElementById('qr-message');
+            
+            if (data.qrCode && data.authenticationStatus === 'aguardando_scan') {
+                // Mostra QR Code
+                qrSection.classList.remove('hidden', 'qr-expired');
+                qrSection.classList.add('qr-waiting');
+                qrImage.src = data.qrCode;
+                qrMessage.textContent = 'Escaneie o QR Code abaixo com seu WhatsApp';
+                console.log('📱 QR Code exibido no dashboard');
+            } else if (data.qrCodeExpired) {
+                // QR Code expirado
+                qrSection.classList.remove('hidden', 'qr-waiting');
+                qrSection.classList.add('qr-expired');
+                qrMessage.textContent = 'QR Code expirado. Aguarde um novo...';
+                console.log('⚠️ QR Code expirado');
+            } else if (['conectado', 'autenticado'].includes(data.authenticationStatus)) {
+                // Conectado - esconde QR Code
+                qrSection.classList.add('hidden');
+                console.log('✅ WhatsApp conectado - QR Code ocultado');
+            } else {
+                // Outros status - esconde QR Code
+                qrSection.classList.add('hidden');
+            }
         }
         
         async function loadData() {
@@ -183,17 +247,21 @@
                 document.getElementById('auth-status').textContent = statusText;
                 document.getElementById('instructions').textContent = getInstructions(status);
                 
-                console.log('Dashboard atualizado:', new Date().toLocaleTimeString());
+                // Atualiza QR Code
+                updateQRCode(data);
+                
+                console.log('Dashboard atualizado:', new Date().toLocaleTimeString(), `Status: ${status}`);
                 
             } catch (error) {
                 console.error('Erro ao carregar dados:', error);
                 document.getElementById('status').innerHTML = '<span class="status offline">Erro</span>';
                 document.getElementById('instructions').textContent = '❌ Não foi possível conectar ao bot. Verifique se o serviço está rodando.';
+                document.getElementById('qr-section').classList.add('hidden');
             }
         }
         
         function refresh() {
-            console.log('Atualizando dashboard...');
+            console.log('Atualizando dashboard manualmente...');
             loadData();
         }
         
@@ -201,11 +269,11 @@
         console.log('Inicializando dashboard...');
         loadData();
         
-        // Auto-refresh a cada 30 segundos
+        // Auto-refresh a cada 15 segundos (mais rápido para capturar QR Code)
         setInterval(() => {
             console.log('Auto-refresh...');
             loadData();
-        }, 30000);
+        }, 15000);
     </script>
 </body>
 </html>
