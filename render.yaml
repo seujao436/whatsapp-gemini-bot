@@ -1,16 +1,18 @@
 services:
   - type: web
-    name: whatsapp-gemini-bot
+    name: tts-assistente-voz-ia
     runtime: node
-    plan: free
-    region: oregon
-    branch: main
     buildCommand: npm install
     startCommand: npm start
-    healthCheckPath: /ping
-    autoDeploy: true
+    plan: free
+    autoDeploy: false
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 10000
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ELEVENLABS_API_KEY
+        sync: false
+    healthCheckPath: /health
